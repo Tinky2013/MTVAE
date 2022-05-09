@@ -1,0 +1,2 @@
+network：网络数据示例（synthetic full data）
+profile：synthetic user profile data
