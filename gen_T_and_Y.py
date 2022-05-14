@@ -67,7 +67,5 @@ def generate(df):
     df_out = pd.concat([df, out], axis=1)
     return df_out
 
-train = pd.read_csv('data/profile_train.csv')
-eval = pd.read_csv('data/profile_eval.csv')
+train = pd.read_csv('data/Uprofile_train.csv')
 generate(train).to_csv('data/gen_train.csv',index=False)
-generate(eval).to_csv('data/gen_eval.csv',index=False)
