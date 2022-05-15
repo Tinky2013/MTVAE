@@ -1,5 +1,6 @@
 import pandas as pd
 import numpy as np
+import random
 
 import torch
 import torch.nn as nn
@@ -17,6 +18,12 @@ from pyro.util import torch_isnan
 from util import NormalNet, DistributionNet,\
     NormalMeanNet, BernoulliNet, MultivariateBetaNet, CategoricalNet, MultivariateBernoulliNet, DiagNormalNet
 
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
 class Model(PyroModule):
     """
@@ -73,6 +80,12 @@ class Model(PyroModule):
             xcon = pyro.sample("x", self.xcon_dist(z), obs=xcon)
             t = pyro.sample("t", self.t_dist(z), obs=t)
         return self.y_dist(t, z).mean
+
+    def get_z(self):
+        # TODO: check x.size(0)
+        with pyro.plate("data"):
+            z = pyro.sample("z", self.z_dist())
+        return z
 
     # p(z)
     def z_dist(self):
@@ -245,6 +258,35 @@ class MTVAE(nn.Module):
         # len(result)=1
         return torch.cat(result)
 
+    @torch.no_grad()
+    def check_z(self, x_bi, x_con, t):
+        mc_samples = self.mc_samples
+        if not torch._C._get_tracing_state():
+            assert x_bi.dim() == 2 and x_bi.size(-1) == self.xbi_dim
+            assert x_con.dim() == 2 and x_con.size(-1) == self.xcon_dim
+
+        # x_bi: (num_sample, xbi_dim), t: (num_sample, treat_dim)
+        d=torch.cat((x_bi, x_con, t),dim=-1) # d: (len(data), feature_dim+treat_dim)
+        dataloader = [d]
+        print("getting the embeddings")
+        result = []
+        hide_list = ['t'+str(i) for i in range(self.treat_dim)]+['y']
+        for d in dataloader:
+            # d: (len(data), feature_dim+treat_dim)
+            with pyro.plate("num_particles", mc_samples, dim=-2):
+                with poutine.trace() as tr, poutine.block(hide=hide_list):
+                    self.guide(d[:,0:4],d[:,4])    # xbi, xcon
+                with poutine.do(data=dict(t=torch.tensor(d[:,5:]))):
+                    z = poutine.replay(self.model.get_z, tr.trace)()
+
+            # y_hat: (len(data))
+            # if not torch._C._get_tracing_state():
+            #     print("mean y_hat = {:0.6g}".format(y_hat.mean()))
+            result.append(z)    # ite: (len(x))
+        # len(result)=1
+        return z
+
+
     def to_script_module(self):
         """
         Compile this module using :func:`torch.jit.trace_module` ,
@@ -269,7 +311,7 @@ def get_dt(path):
     if x_con.dim()==1:
         x_con = x_con.unsqueeze(1)
     t = torch.tensor(np.array(dt.loc[:,'t0':'t7']))
-    y = torch.tensor(dt['y(t-1)'])
+    y = torch.tensor(dt['y0'])
     return x_bi, x_con, t, y
 
 def main():
@@ -285,6 +327,9 @@ def main():
     pyro.clear_param_store()
     mtvae = MTVAE()
     mtvae.fit(x_bi, x_con, t, y)
+    z = mtvae.check_z(x_bi, x_con, t)
+    pd.DataFrame(np.mean(z.detach().numpy(),axis=0)).to_csv('save_emb/mtvae_dim_' + str(PARAM['latent_dim']) + '.csv',
+                                                  index=False)
 
     # Evaluate.
     x_bi, x_con, t, y = get_dt('data/gendt_test.csv')
@@ -304,11 +349,11 @@ PARAM = {
     'xcon_dim': 1,
     'treat_dim': 8,
     # model
-    'latent_dim': 25,
-    'hidden_dim': 200,
-    'num_layers': 3,
+    'latent_dim': 4,
+    'hidden_dim': 16,
+    'num_layers': 2,
     # train
-    'num_epochs': 20,
+    'num_epochs': 200,
     'batch_size': 20,
     'learning_rate': 1e-3,
     'learning_rate_decay': 0.1,
@@ -317,8 +362,9 @@ PARAM = {
     'seed': 100,
     'cuda': False,
     # eval
-    'mc_samples': 50,  # number of monte carlo sample
+    'mc_samples': 200,  # number of monte carlo sample
 }
 
 if __name__ == "__main__":
+    set_seed(100)
     main()

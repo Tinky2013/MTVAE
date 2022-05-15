@@ -1,3 +1,5 @@
+import random
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -8,6 +10,13 @@ import pandas as pd
 
 import numpy as np
 import scipy.sparse as sp
+
+def set_seed(seed):
+	random.seed(seed)
+	np.random.seed(seed)
+	torch.manual_seed(seed)
+	torch.cuda.manual_seed(seed)
+	torch.cuda.manual_seed_all(seed)
 
 def sparse_to_tuple(sparse_mx):
 	# the matrix needs to be coo
@@ -163,8 +172,8 @@ class VGAE(nn.Module):
 		return sampled_z
 
 	def forward(self, X):
-		Z = self.encode(X)
-		A_pred = dot_product_decode(Z)
+		self.Z = self.encode(X)
+		A_pred = dot_product_decode(self.Z)
 		return A_pred
 
 def sigmoid(x):
@@ -178,11 +187,12 @@ def get_acc(adj_rec, adj_label):
 	return accuracy
 
 def load_data():
-	A = np.array(pd.read_csv('data/usernet_train.csv'))
-	feature = np.array(pd.read_csv('data/profile_train.csv').iloc[:,1:])
+	A = np.array(pd.read_csv('data/Unet_train.csv'))
+	feature = np.array(pd.read_csv('data/Ux_train.csv').iloc[:,1:])
 	return A, feature
 
 def main():
+	set_seed(100)
 	def get_scores(edges_pos, edges_neg, adj_rec):
 		# Predict on test set of edges
 		preds = []
@@ -291,25 +301,26 @@ def main():
 		# evaluation
 		train_acc = get_acc(A_pred,adj_label)
 		val_roc, val_ap = get_scores(val_edges, val_edges_false, A_pred)
-		print("Epoch:", '%04d' % (epoch + 1), "train_loss=", "{:.5f}".format(loss.item()),
-			  "train_acc=", "{:.5f}".format(train_acc), "val_roc=", "{:.5f}".format(val_roc),
-			  "val_ap=", "{:.5f}".format(val_ap),
-			  "time=", "{:.5f}".format(time.time() - t))
+		if epoch % 100 == 0:
+			print("Epoch:", '%04d' % (epoch), "train_loss=", "{:.5f}".format(loss.item()),
+				  "train_acc=", "{:.5f}".format(train_acc), "val_roc=", "{:.5f}".format(val_roc),
+				  "val_ap=", "{:.5f}".format(val_ap),
+				  "time=", "{:.5f}".format(time.time() - t))
 
 	# test the model
 	test_roc, test_ap = get_scores(test_edges, test_edges_false, A_pred)
 	print("End of training!", "test_roc=", "{:.5f}".format(test_roc),
 		  "test_ap=", "{:.5f}".format(test_ap))
+	pd.DataFrame(model.Z.detach().numpy()).to_csv('save_emb/vgae_dim_'+str(PARAM['hidden2_dim'])+'.csv', index=False)
 
 PARAM = {
 	# model
 	'input_dim': 5,
-	'hidden1_dim': 32,
-	'hidden2_dim': 16,
+	'hidden1_dim': 16,
+	'hidden2_dim': 4,
 	# train
-	'num_epochs': 1000,
+	'num_epochs': 2000,
 	'learning_rate': 0.01,
-
 }
 
 if __name__ == "__main__":

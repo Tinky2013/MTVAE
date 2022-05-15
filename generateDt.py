@@ -1,11 +1,15 @@
 import pandas as pd
 import numpy as np
 import scipy.sparse as sp
+import random
 '''
 
 根据用户的相似性生成用户网络
 
 '''
+def set_seed(seed):
+    random.seed(seed)
+    np.random.seed(seed)
 
 def generate_network(ux, uz):
     A_dt = np.eye(len(ux), len(ux))
@@ -148,4 +152,5 @@ PARAM = {
 }
 
 if __name__ == "__main__":
+    set_seed(100)
     main()
