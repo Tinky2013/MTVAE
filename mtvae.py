@@ -37,7 +37,8 @@ class Model(PyroModule):
         self.hidden_dim = PARAM['hidden_dim']
         self.treat_dim = PARAM['treat_dim']
         self.num_layers = PARAM['num_layers']
-        self.xcat_dim = PARAM['xcon_dim']
+        self.xbi_dim = PARAM['xbi_dim']
+        self.xcon_dim = PARAM['xcon_dim']
         super().__init__()
         # f2
         self.t_nn = MultivariateBetaNet([self.latent_dim] + [self.hidden_dim]*self.num_layers,
@@ -45,34 +46,30 @@ class Model(PyroModule):
         # f3
         self.y_nn = NormalMeanNet([self.latent_dim+self.treat_dim] + [self.hidden_dim]*self.num_layers)
         # f4
-        self.xbi_nn = BernoulliNet([self.latent_dim] + [self.hidden_dim]*self.num_layers)
-        # f5
-        self.xcat_nn = CategoricalNet([self.latent_dim] + [self.hidden_dim]*self.num_layers,
-                                      3) # TODO: Num of classes in categorical variables
+        self.xbi_nn = MultivariateBernoulliNet([self.latent_dim] + [self.hidden_dim]*self.num_layers,
+                                   self.xbi_dim)
         # f6/f7
-        self.xcon_nn = NormalNet([self.latent_dim] + [self.hidden_dim]*self.num_layers + [self.xcat_dim])
+        self.xcon_nn = NormalNet([self.latent_dim] + [self.hidden_dim]*self.num_layers + [self.xcon_dim])
 
-    def forward(self, xbi, xcat, xcon, t=None, y=None, size=None):
+    def forward(self, xbi, xcon, t=None, y=None, size=None):
         if size is None:
             size = xbi.size(0)
         # TODO: check subsample
         with pyro.plate("data", size, subsample=xbi):
             z = pyro.sample("z", self.z_dist())                     # z: (batch_size, latend_dim)
             xbi = pyro.sample("xbi", self.xbi_dist(z), obs=xbi)     # xbi: (batch_size, xbi_dim)
-            xcat = pyro.sample("xcat", self.xcat_dist(z), obs=xcat) # xcat: (batch_size, xcat_dim)
             xcon = pyro.sample("xcon", self.xcon_dist(z), obs=xcon) # xcon: (batch_size, xcon_dim)
             t = pyro.sample("t", self.t_dist(z), obs=t)             # t: (batch_size, treat_dim)
             y = pyro.sample("y", self.y_dist(t, z), obs=y)          # y: (batch_size)
-        return y
+            return y
 
-    def y_mean(self, xbi, xcat, xcon, t=None):
+    def y_mean(self, xbi, xcon, t=None):
         # TODO: check x.size(0)
         with pyro.plate("data"):
             z = pyro.sample("z", self.z_dist())
             if z.dim() == 3:
                 z = torch.mean(z, 0, False)
             xbi = pyro.sample("x", self.xbi_dist(z), obs=xbi)
-            xcat = pyro.sample("x", self.xcat_dist(z), obs=xcat)
             xcon = pyro.sample("x", self.xcon_dist(z), obs=xcon)
             t = pyro.sample("t", self.t_dist(z), obs=t)
         return self.y_dist(t, z).mean
@@ -82,11 +79,8 @@ class Model(PyroModule):
         return dist.Normal(0, 1).expand([self.latent_dim]).to_event(1)
     # p(x|z)
     def xbi_dist(self, z):
-        (logits,) = self.xbi_nn(z)
+        logits = self.xbi_nn(z)
         return dist.Bernoulli(logits=logits).to_event(1)
-    def xcat_dist(self, z):
-        cat = self.xcat_nn(z)
-        return dist.Categorical(cat).to_event(1)
     def xcon_dist(self, z):
         loc, scale = self.xcon_nn(z)
         return dist.Normal(loc, scale).to_event(1)
@@ -117,7 +111,7 @@ class Guide(PyroModule):
         self.latent_dim = PARAM['latent_dim']
         self.hidden_dim = PARAM['hidden_dim']
         self.treat_dim = PARAM['treat_dim']
-        self.feature_dim = PARAM['xbi_dim']+PARAM['xcat_dim']+PARAM['xcon_dim']
+        self.feature_dim = PARAM['xbi_dim']+PARAM['xcon_dim']
         super().__init__()
         self.t_nn = MultivariateBetaNet([self.feature_dim], self.treat_dim)
         # g4
@@ -128,15 +122,13 @@ class Guide(PyroModule):
             self.hidden_dim,
             self.latent_dim])
 
-    def forward(self, x_bi, x_cat, x_con, t=None, y=None, size=None):
+    def forward(self, x_bi, x_con, t=None, y=None, size=None):
         if x_bi.dim()==1:
             x_bi = x_bi.unsqueeze(-1)
-        if x_cat.dim()==1:
-            x_cat = x_cat.unsqueeze(-1)
         if x_con.dim()==1:
             x_con = x_con.unsqueeze(-1)
 
-        x = torch.cat((x_bi, x_cat, x_con), 1).float()
+        x = torch.cat((x_bi, x_con), 1).float()
         # x.shape: (batch_size, feature_dim)
         if size is None:
             size = x.size(0)
@@ -194,7 +186,6 @@ class MTVAE(nn.Module):
         super().__init__()
 
         self.xbi_dim = PARAM['xbi_dim']
-        self.xcat_dim = PARAM['xcat_dim']
         self.xcon_dim = PARAM['xcon_dim']
         self.treat_dim = PARAM['treat_dim']
         self.mc_samples = PARAM['mc_samples']
@@ -202,15 +193,14 @@ class MTVAE(nn.Module):
         self.model = Model()
         self.guide = Guide()
 
-    def fit(self, x_bi, x_cat, x_con, t, y):
+    def fit(self, x_bi, x_con, t, y):
         num_epochs, batch_size, learning_rate, learning_rate_decay, weight_decay, log_every = \
             PARAM['num_epochs'], PARAM['batch_size'], PARAM['learning_rate'], PARAM['learning_rate_decay'], PARAM['weight_decay'], PARAM['log_every']
         assert x_bi.dim() == 2 and x_bi.size(-1) == self.xbi_dim
-        assert x_cat.dim() == 2 and x_cat.size(-1) == self.xcat_dim
         assert x_con.dim() == 2 and x_con.size(-1) == self.xcon_dim
         assert t.size(-1) == self.treat_dim
 
-        dataset = TensorDataset(x_bi, x_cat, x_con, t, y)
+        dataset = TensorDataset(x_bi, x_con, t, y)
         dataloader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
         print("Training with {} minibatches per epoch".format(len(dataloader)))
         num_steps = num_epochs * len(dataloader)
@@ -219,8 +209,8 @@ class MTVAE(nn.Module):
         svi = SVI(self.model, self.guide, optim, TraceCausalEffect_ELBO())  # TODO: prepare the ELBO estimator
         losses = []
         for epoch in range(num_epochs):
-            for x_bi, x_cat, x_con, t, y in dataloader:
-                loss = svi.step(x_bi, x_cat, x_con, t, y, size=len(dataset)) / len(dataset)
+            for x_bi, x_con, t, y in dataloader:
+                loss = svi.step(x_bi, x_con, t, y, size=len(dataset)) / len(dataset)
                 if log_every and len(losses) % log_every == 0:
                     print("step {: >5d} loss = {:0.6g}".format(len(losses), loss))
                 assert not torch_isnan(loss)
@@ -228,15 +218,14 @@ class MTVAE(nn.Module):
         return losses
 
     @torch.no_grad()
-    def potential_y(self, x_bi, x_cat, x_con, t):
+    def potential_y(self, x_bi, x_con, t):
         mc_samples = self.mc_samples
         if not torch._C._get_tracing_state():
             assert x_bi.dim() == 2 and x_bi.size(-1) == self.xbi_dim
-            assert x_cat.dim() == 2 and x_cat.size(-1) == self.xcat_dim
             assert x_con.dim() == 2 and x_con.size(-1) == self.xcon_dim
 
         # x_bi: (num_sample, xbi_dim), t: (num_sample, treat_dim)
-        d=torch.cat((x_bi, x_cat, x_con, t),dim=-1) # d: (len(data), feature_dim+treat_dim)
+        d=torch.cat((x_bi, x_con, t),dim=-1) # d: (len(data), feature_dim+treat_dim)
         dataloader = [d]
         print("Evaluating {} minibatches".format(len(dataloader)))
         result = []
@@ -245,10 +234,9 @@ class MTVAE(nn.Module):
             # d: (len(data), feature_dim+treat_dim)
             with pyro.plate("num_particles", mc_samples, dim=-2):
                 with poutine.trace() as tr, poutine.block(hide=hide_list):
-                    self.guide(d[:,0],d[:,1],d[:,2])    # xbi, xcat, xcon
-
-                with poutine.do(data=dict(t=torch.tensor(d[:,3:]))):
-                    y_hat = poutine.replay(self.model.y_mean, tr.trace)(d[:,0],d[:,1],d[:,2])
+                    self.guide(d[:,0:4],d[:,4])    # xbi, xcon
+                with poutine.do(data=dict(t=torch.tensor(d[:,5:]))):
+                    y_hat = poutine.replay(self.model.y_mean, tr.trace)(d[:,0:4],d[:,4])
 
             # y_hat: (len(data))
             # if not torch._C._get_tracing_state():
@@ -274,18 +262,15 @@ class MTVAE(nn.Module):
 
 def get_dt(path):
     dt = pd.read_csv(path)
-    x_bi = torch.tensor(dt['gender']).float()
-    x_cat = torch.tensor(dt['cluster']).float()
+    x_bi = torch.tensor(np.array(dt.loc[:,'gender':'cluster_2'])).float()
     x_con = torch.tensor(dt['age']).float()
     if x_bi.dim()==1:
         x_bi = x_bi.unsqueeze(1)
-    if x_cat.dim()==1:
-        x_cat = x_cat.unsqueeze(1)
     if x_con.dim()==1:
         x_con = x_con.unsqueeze(1)
     t = torch.tensor(np.array(dt.loc[:,'t0':'t7']))
-    y = torch.tensor(dt['y'])
-    return x_bi, x_cat, x_con, t, y
+    y = torch.tensor(dt['y(t-1)'])
+    return x_bi, x_con, t, y
 
 def main():
     if PARAM['cuda']:
@@ -293,21 +278,20 @@ def main():
 
     # Generate synthetic data.
     pyro.set_rng_seed(PARAM['seed'])
-
-    x_bi, x_cat, x_con, t, y = get_dt('data/gen_train.csv')
+    x_bi, x_con, t, y = get_dt('data/gendt_train.csv')
 
     # Train.
     pyro.set_rng_seed(PARAM['seed'])
     pyro.clear_param_store()
     mtvae = MTVAE()
-    mtvae.fit(x_bi, x_cat, x_con, t, y)
+    mtvae.fit(x_bi, x_con, t, y)
 
     # Evaluate.
-    x_bi, x_cat, x_con, t, y = get_dt('data/gen_eval.csv')
-    est_y = mtvae.potential_y(x_bi, x_cat, x_con, t)    # est_y: (len(data))
+    x_bi, x_con, t, y = get_dt('data/gendt_test.csv')
+    est_y = mtvae.potential_y(x_bi, x_con, t)    # est_y: (len(data))
 
     # estimate the potential outcome
-    true_ave_y = y.mean()
+    true_ave_y = y.float().mean()
     est_ave_y = est_y.mean()
     print("true outcome = {:0.3g}".format(true_ave_y.item()))
     print("estimated Average potential outcome = {:0.3g}".format(est_ave_y.item()))
@@ -316,8 +300,7 @@ PARAM = {
     'description': "Multiple Treatment Causal Effect Variational Autoencoder",
     # data
     'num_data': 100,
-    'xbi_dim': 1,
-    'xcat_dim': 1,
+    'xbi_dim': 4,
     'xcon_dim': 1,
     'treat_dim': 8,
     # model
@@ -325,7 +308,7 @@ PARAM = {
     'hidden_dim': 200,
     'num_layers': 3,
     # train
-    'num_epochs': 100,
+    'num_epochs': 20,
     'batch_size': 20,
     'learning_rate': 1e-3,
     'learning_rate_decay': 0.1,

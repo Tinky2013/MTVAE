@@ -4,7 +4,7 @@ import pandas as pd
 import networkx as nx
 import matplotlib.pyplot as plt
 
-A = np.array(pd.read_csv('data/usernet_train.csv'))	# matrix (num_nodes, num_nodes)
+A = np.array(pd.read_csv('data/Unet_train.csv'))	# matrix (num_nodes, num_nodes)
 A = A - sp.dia_matrix((A.diagonal()[np.newaxis, :], [0]), shape=A.shape)
 A = sp.coo_matrix(A)
 coords = [(A.row[i], A.col[i]) for i in range(len(A.row))]
