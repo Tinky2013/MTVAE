@@ -83,7 +83,7 @@ def mask_test_edges(adj):
 		idx_j = np.random.randint(0, adj.shape[0])
 		if idx_i == idx_j:
 			continue
-		if ismember([idx_i, idx_j], edges_all):
+		if ismember([idx_i, idx_j], edges_all):	# 这个随机负样本要在原图中不存在
 			continue
 		if test_edges_false:
 			if ismember([idx_j, idx_i], np.array(test_edges_false)):
@@ -97,6 +97,8 @@ def mask_test_edges(adj):
 		idx_i = np.random.randint(0, adj.shape[0])
 		idx_j = np.random.randint(0, adj.shape[0])
 		if idx_i == idx_j:
+			continue
+		if ismember([idx_i, idx_j], edges_all):	# 这个随机负样本要在原图中不存在
 			continue
 		if ismember([idx_i, idx_j], train_edges):
 			continue
@@ -113,11 +115,12 @@ def mask_test_edges(adj):
 				continue
 		val_edges_false.append([idx_i, idx_j])
 
-	assert ~ismember(test_edges_false, edges_all)
-	assert ~ismember(val_edges_false, edges_all)
 	assert ~ismember(val_edges, train_edges)
 	assert ~ismember(test_edges, train_edges)
 	assert ~ismember(val_edges, test_edges)
+	assert ~ismember(test_edges_false, edges_all)
+	assert ~ismember(val_edges_false, edges_all)
+
 
 	data = np.ones(train_edges.shape[0])
 
@@ -187,8 +190,8 @@ def get_acc(adj_rec, adj_label):
 	return accuracy
 
 def load_data():
-	A = np.array(pd.read_csv('data/Unet_train.csv'))
-	feature = np.array(pd.read_csv('data/Ux_train.csv').iloc[:,1:])
+	A = np.array(pd.read_csv(PARAM['network']))
+	feature = np.array(pd.read_csv(PARAM['feature']).iloc[:,1:])
 	return A, feature
 
 def main():
@@ -311,7 +314,7 @@ def main():
 	test_roc, test_ap = get_scores(test_edges, test_edges_false, A_pred)
 	print("End of training!", "test_roc=", "{:.5f}".format(test_roc),
 		  "test_ap=", "{:.5f}".format(test_ap))
-	pd.DataFrame(model.Z.detach().numpy()).to_csv('save_emb/vgae_dim_'+str(PARAM['hidden2_dim'])+'.csv', index=False)
+	pd.DataFrame(model.Z.detach().numpy()).to_csv('save_emb/vgae_dim_'+str(PARAM['hidden2_dim'])+'_'+str(PARAM['num_nodes'])+'.csv', index=False)
 
 PARAM = {
 	# model
@@ -321,6 +324,10 @@ PARAM = {
 	# train
 	'num_epochs': 2000,
 	'learning_rate': 0.01,
+	# data
+	'feature':'data/Ux_train.csv',
+	'network':'data/Unet_train.csv',
+	'num_nodes': 100,
 }
 
 if __name__ == "__main__":

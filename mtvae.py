@@ -311,7 +311,7 @@ def get_dt(path):
     if x_con.dim()==1:
         x_con = x_con.unsqueeze(1)
     t = torch.tensor(np.array(dt.loc[:,'t0':'t7']))
-    y = torch.tensor(dt['y0'])
+    y = torch.tensor(dt['y1'])
     return x_bi, x_con, t, y
 
 def main():
@@ -320,7 +320,7 @@ def main():
 
     # Generate synthetic data.
     pyro.set_rng_seed(PARAM['seed'])
-    x_bi, x_con, t, y = get_dt('data/gendt_train.csv')
+    x_bi, x_con, t, y = get_dt(PARAM['data'])
 
     # Train.
     pyro.set_rng_seed(PARAM['seed'])
@@ -328,23 +328,24 @@ def main():
     mtvae = MTVAE()
     mtvae.fit(x_bi, x_con, t, y)
     z = mtvae.check_z(x_bi, x_con, t)
-    pd.DataFrame(np.mean(z.detach().numpy(),axis=0)).to_csv('save_emb/mtvae_dim_' + str(PARAM['latent_dim']) + '.csv',
+    pd.DataFrame(np.mean(z.detach().numpy(),axis=0)).to_csv('save_emb/mtvae_dim_' + str(PARAM['latent_dim']) + '_'+str(PARAM['num_nodes'])+'.csv',
                                                   index=False)
 
     # Evaluate.
-    x_bi, x_con, t, y = get_dt('data/gendt_test.csv')
-    est_y = mtvae.potential_y(x_bi, x_con, t)    # est_y: (len(data))
-
-    # estimate the potential outcome
-    true_ave_y = y.float().mean()
-    est_ave_y = est_y.mean()
-    print("true outcome = {:0.3g}".format(true_ave_y.item()))
-    print("estimated Average potential outcome = {:0.3g}".format(est_ave_y.item()))
+    # x_bi, x_con, t, y = get_dt('data/gendt_test.csv')
+    # est_y = mtvae.potential_y(x_bi, x_con, t)    # est_y: (len(data))
+    #
+    # # estimate the potential outcome
+    # true_ave_y = y.float().mean()
+    # est_ave_y = est_y.mean()
+    # print("true outcome = {:0.3g}".format(true_ave_y.item()))
+    # print("estimated Average potential outcome = {:0.3g}".format(est_ave_y.item()))
 
 PARAM = {
     'description': "Multiple Treatment Causal Effect Variational Autoencoder",
     # data
-    'num_data': 100,
+    'data': 'data/gendt_train.csv',
+    'num_nodes': 100,
     'xbi_dim': 4,
     'xcon_dim': 1,
     'treat_dim': 8,
