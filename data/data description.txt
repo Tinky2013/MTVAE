@@ -1,3 +1,0 @@
-mtsample：Multiple Treatment数据示例（synthetic full data）
-profile：synthetic user profile data
-gen_eval：根据特定规则生成的Multiple Treatment数据
