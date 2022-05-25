@@ -48,19 +48,15 @@ def main():
 		with torch.no_grad():
 			z = model.encode(x, train_pos_edge_index)
 		if save_emb == True:
-			if PARAM['has_feature']==False:
-				emb_path = 'save_emb/vgae_' + str(PARAM['num_nodes']) + '/' + graph + '_zdim_' + str(PARAM['z_dim'])
-			else:
-				emb_path = 'save_emb/vgae_' + str(PARAM['num_nodes']) + '/' + graph + '_zdim_' + str(PARAM['z_dim']) + '_withX'
+			emb_path = 'save_emb/vgae/' + graph + '_zdim_' + str(PARAM['z_dim'])
 			if not os.path.isdir(emb_path):
 				os.makedirs(emb_path)
 			pd.DataFrame(z.detach().numpy()).to_csv(emb_path + '/emb_' + str(i) + '.csv', index=False)
 		return model.test(z, pos_edge_index, neg_edge_index)
 
 	A = np.array(pd.read_csv(PARAM['network']))
-	features = np.array(pd.read_csv(PARAM['feature'])[PARAM['feature_col']])
-	if PARAM['has_feature'] == False:
-		features = np.eye(PARAM['num_nodes'],PARAM['num_nodes'])
+	#features = np.array(pd.read_csv(PARAM['feature'])[PARAM['feature_col']])
+	features = np.eye(PARAM['num_nodes'],PARAM['num_nodes'])
 	if len(features.shape) == 1:
 		features = features[:,np.newaxis]
 	# features: (num_nodes, feature_dim)
@@ -95,8 +91,8 @@ SEED = 100
 set_seed(SEED)
 
 if __name__ == "__main__":
-	graph = '0_1.5_1.5_3_X[0]_Z[0.4]'
-	for i in range(11,21):
+	graph = 'D_0_3_1.5_100_U'
+	for i in range(11,111):
 		PARAM = {
 			# model
 			'z_dim': 4,
@@ -104,9 +100,8 @@ if __name__ == "__main__":
 			'num_epochs': 1000,
 			'learning_rate': 0.005,
 			# data
-			'has_feature': True,	# false and true, run two times
-			'feature': 'data/gendt/'+graph+'/gendt_'+str(i)+'.csv',
-			'feature_col': 'x',
+			#'feature': 'data/gendt/'+data+'/gendt_'+str(i)+'.csv',
+			#'feature_col': 'x',
 			'network': 'data/gendt/'+graph+'/net_'+str(i)+'.csv',
 			'num_nodes': 100,
 		}
