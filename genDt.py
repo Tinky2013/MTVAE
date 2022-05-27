@@ -22,7 +22,11 @@ def generate_network(uz):
         for j in range(i + 1, len(uz)):
             # use the data except the IDs
             zi, zj = np.array(uz.iloc[i,:]), np.array(uz.iloc[j,:])
+            # B, C, D, E
             logit = np.exp(PARAM['alpha0'] - PARAM['alpha1'] * np.sqrt(np.square(zi-zj))[0]) * PARAM['network_density']
+            # A
+            # logit = np.exp(PARAM['alpha0'] - PARAM['alpha1'] * np.sqrt(np.square(zi - np.array(0.5)))[0]) * PARAM['network_density']
+
             friend = np.random.binomial(1, logit / (1 + logit))
             A_dt[i][j], A_dt[j][i] = friend, friend
     network_density.append(((A_dt.sum()-N)*2/(N*(N-1))))
@@ -56,12 +60,7 @@ def cal_influence(A, y_binary, uz, uz_pi):
     #         ij_inf = 1.5 - np.abs(uz.iloc[i,:]-uz.iloc[j,:])
     #         influence_weight[i][j] = ij_inf
     #         influence_weight[j][i] = ij_inf
-    # [F] Uniform weight
-    # for i in range(N):
-    #     for j in range(i, N):
-    #         ij_inf = 1.5 - np.abs(uz_pi.iloc[i,:]-uz_pi.iloc[j,:])
-    #         influence_weight[i][j] = ij_inf
-    #         influence_weight[j][i] = ij_inf
+
     A = np.array(A)
     influence_true, influence_observed = np.zeros(N), np.zeros(N)
     for j in range(N):
@@ -105,7 +104,10 @@ def main():
     A = generate_network(uz)
     A.to_csv(DATA_PATH['Unet'], index=False)
     # generate y0
-    y0 = pd.DataFrame(np.random.normal(PARAM['betaZ']*(z-0.5), 0.2, size=PARAM['num_nodes']), columns=['y0'])  # y(t-1)
+    # A, B, D, E
+    # y0 = pd.DataFrame(np.random.normal(PARAM['betaZ']*(z-0.5), 0.2, size=PARAM['num_nodes']), columns=['y0'])  # y(t-1)
+    # C
+    y0 = pd.DataFrame(np.random.normal(0, 0.2, size=PARAM['num_nodes']), columns=['y0'])  # y(t-1)
     y0_binary = y0.copy()
     y0_binary[y0_binary<0]=0
     y0_binary[y0_binary>0]=1
@@ -125,7 +127,7 @@ def main():
 
 PARAM = {
     # 0. causal graph
-    'causal_graph': 'B',
+    'causal_graph': 'C',
 
     # 1. net_param
     'alpha0': 0,
