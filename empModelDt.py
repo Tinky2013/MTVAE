@@ -45,8 +45,8 @@ def main():
 
 
 if __name__ == "__main__":
-    data = 'A_0_3_0.1_100_N'
-    Prob = 0.086
+    data = 'A_0_0.5_0.1_100_N'
+    Prob = 0.094
     # graph = 'test'
     inf0, ylag0 = [], []
     inf1, ylag1 = [], []

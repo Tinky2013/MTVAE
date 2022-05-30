@@ -48,15 +48,20 @@ def main():
 		with torch.no_grad():
 			z = model.encode(x, train_pos_edge_index)
 		if save_emb == True:
-			emb_path = 'save_emb/vgae/' + graph + '_zdim_' + str(PARAM['z_dim'])
+			if PARAM['has_feature']==True:
+				emb_path = 'save_emb/vgae/' + graph + 'X_zdim_' + str(PARAM['z_dim'])
+			else:
+				emb_path = 'save_emb/vgae/' + graph + '_zdim_' + str(PARAM['z_dim'])
 			if not os.path.isdir(emb_path):
 				os.makedirs(emb_path)
 			pd.DataFrame(z.detach().numpy()).to_csv(emb_path + '/emb_' + str(i) + '.csv', index=False)
 		return model.test(z, pos_edge_index, neg_edge_index)
 
 	A = np.array(pd.read_csv(PARAM['network']))
-	#features = np.array(pd.read_csv(PARAM['feature'])[PARAM['feature_col']])
-	features = np.eye(PARAM['num_nodes'],PARAM['num_nodes'])
+	if PARAM['has_feature']==True:
+		features = np.array(pd.read_csv(PARAM['feature'])[PARAM['feature_col']])
+	else:
+		features = np.eye(PARAM['num_nodes'],PARAM['num_nodes'])
 	if len(features.shape) == 1:
 		features = features[:,np.newaxis]
 	# features: (num_nodes, feature_dim)
@@ -100,8 +105,9 @@ if __name__ == "__main__":
 			'num_epochs': 1000,
 			'learning_rate': 0.005,
 			# data
-			#'feature': 'data/gendt/'+data+'/gendt_'+str(i)+'.csv',
-			#'feature_col': 'x',
+			'feature': 'data/gendt/'+graph+'/gendt_'+str(i)+'.csv',
+			'feature_col': 'x',
+			'has_feature': False,
 			'network': 'data/gendt/'+graph+'/net_'+str(i)+'.csv',
 			'num_nodes': 100,
 		}

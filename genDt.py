@@ -105,9 +105,9 @@ def main():
     A.to_csv(DATA_PATH['Unet'], index=False)
     # generate y0
     # A, B, D, E
-    # y0 = pd.DataFrame(np.random.normal(PARAM['betaZ']*(z-0.5), 0.2, size=PARAM['num_nodes']), columns=['y0'])  # y(t-1)
+    y0 = pd.DataFrame(np.random.normal(PARAM['betaZ']*(z-0.5), 0.2, size=PARAM['num_nodes']), columns=['y0'])  # y(t-1)
     # C
-    y0 = pd.DataFrame(np.random.normal(0, 0.2, size=PARAM['num_nodes']), columns=['y0'])  # y(t-1)
+    # y0 = pd.DataFrame(np.random.normal(0, 0.2, size=PARAM['num_nodes']), columns=['y0'])  # y(t-1)
     y0_binary = y0.copy()
     y0_binary[y0_binary<0]=0
     y0_binary[y0_binary>0]=1
