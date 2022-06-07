@@ -16,12 +16,18 @@ def main():
     emb.columns = ['emb_'+str(i) for i in range(len(emb.columns))]
     emb_Ba.columns = ['emb_' + str(i) for i in range(len(emb_Ba.columns))]
     emb_fake.columns = ['emb_' + str(i) for i in range(len(emb_fake.columns))]
+
     dt1 = pd.concat([dt,emb], axis=1)
     dt2 = pd.concat([dt,emb_Ba], axis=1)
-    dt3 = pd.concat([dt,emb_fake], axis=1)
+    dt3= pd.concat([dt,emb_fake], axis=1)
+
     vgae_emb4 = ' emb_0 + emb_1 + emb_2 + emb_3'
     vgaeBa_emb4 = ' emb_0 + emb_1 + emb_2 + emb_3'
     fake_emb4 = ' emb_0 + emb_1 + emb_2 + emb_3'
+
+    # vgae_emb16 = ' emb_0 + emb_1 + emb_2 + emb_3 + emb_4 + emb_5 + emb_6 + emb_7 + emb_8 + emb_9 + emb_10 + emb_11 + emb_12 + emb_13 + emb_14 + emb_15'
+    # vgaeBa_emb16 = ' emb_0 + emb_1 + emb_2 + emb_3 + emb_4 + emb_5 + emb_6 + emb_7 + emb_8 + emb_9 + emb_10 + emb_11 + emb_12 + emb_13 + emb_14 + emb_15'
+    # fake_emb16 = ' emb_0 + emb_1 + emb_2 + emb_3 + emb_4 + emb_5 + emb_6 + emb_7 + emb_8 + emb_9 + emb_10 + emb_11 + emb_12 + emb_13 + emb_14 + emb_15'
 
     formula0 = 'y1 ~ y0 + influence_0'
     formula1 = 'y1 ~ y0 + influence_0 +' + vgae_emb4
@@ -43,8 +49,8 @@ def main():
 
 
 if __name__ == "__main__":
-    data = 'C_0_3_0.5_100_N'
-    Prob = 0.352
+    data = 'B_0_3_0.3_100_N'
+    Prob = 0.231
     # graph = 'test'
     inf0, ylag0 = [], []
     inf1, ylag1 = [], []
@@ -53,8 +59,8 @@ if __name__ == "__main__":
     for i in range(11,111):
         data_path = 'data/gendt/' + data + '/gendt_' + str(i) + '.csv'
         emb_path = 'save_emb/vgae/'+ data +'_zdim_4/emb_'+str(i)+'.csv'
-        emb_ba_path = 'save_emb/vgae/'+ data +'Ba2_zdim_4/emb_'+str(i)+'.csv'
-        fake_emb = 'save_emb/fake.csv'
+        emb_ba_path = 'save_emb/vgae/'+ data +'Ba0.1_zdim_4/emb_'+str(i)+'.csv'
+        fake_emb = 'save_emb/fake_dim4.csv'
         main()
         print("regressing: ", i)
     result = pd.DataFrame({
@@ -67,4 +73,4 @@ if __name__ == "__main__":
         'inf3': inf3,
         'ylag3': ylag3,
     })
-    result.to_csv('result/'+data+'Ba2_'+str(Prob)+'p.csv',index=False)
+    result.to_csv('result/'+data+'Ba0.1_'+str(Prob)+'p.csv',index=False)

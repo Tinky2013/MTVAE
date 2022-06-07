@@ -16,8 +16,10 @@ from torch_geometric.transforms import RandomLinkSplit
 from torch_geometric.utils import (negative_sampling, remove_self_loops,
                                    add_self_loops)
 from torch_geometric.nn.inits import reset
-
+from typing import Any, Optional, Tuple
+from torch.autograd import Function
 from sklearn.metrics import roc_auc_score, average_precision_score
+
 EPS = 1e-15
 
 def set_seed(seed):
@@ -38,13 +40,33 @@ class VariationalGCNEncoder(torch.nn.Module):
 		x = self.conv1(x, edge_index).relu()
 		return self.conv_mu(x, edge_index), self.conv_logstd(x, edge_index)
 
+class GradientReverseFunction(Function):
+	@staticmethod
+	def forward(ctx: Any, input: torch.Tensor, coeff: Optional[float] = 1.) -> torch.Tensor:
+		ctx.coeff = coeff
+		output = input * 1.0
+		return output
+
+	@staticmethod
+	def backward(ctx: Any, grad_output: torch.Tensor) -> Tuple[torch.Tensor, Any]:
+		return grad_output.neg() * ctx.coeff, None
+
+class GRL(torch.nn.Module):
+	def __init__(self):
+		super(GRL, self).__init__()
+
+	def forward(self, *input):
+		return GradientReverseFunction.apply(*input)
+
 class Balance(torch.nn.Module):
 	def __init__(self):
 		super(Balance,self).__init__()
 		self.gNet_inDim = 4, # zdim
-		self.gNet =torch.nn.Linear(4, 1)
+		self.gNet = torch.nn.Linear(4, 1)
+		self.grl = GRL()
 
 	def forward(self, emb):
+		emb = self.grl(emb)
 		t_pred = self.gNet(emb)
 		return t_pred
 
@@ -56,6 +78,21 @@ class InnerProductDecoder(torch.nn.Module):
 	def forward_all(self, z, sigmoid=True):
 		adj = torch.matmul(z, z.t())
 		return torch.sigmoid(adj) if sigmoid else adj
+
+
+def calHSIC(z, t):
+	dim = PARAM['z_dim']
+	hsic = torch.zeros(dim)
+	for i in range(dim):
+		Kx = z[:,i].unsqueeze(0) - z[:,i].unsqueeze(1)
+		Ky = t.unsqueeze(0) - t.unsqueeze(1)
+		Kx = torch.exp(-torch.square(Kx)).float()
+		Ky = torch.exp(-torch.square(Ky)).float()
+		Kxy = torch.matmul(Kx, Ky)
+		n = int(Kxy.shape[0])
+		h = torch.trace(Kxy) / n ** 2 + torch.mean(Kx) * torch.mean(Ky) - 2 * torch.mean(Kxy) / n
+		hsic[i] = h * n ** 2 / (n - 1) ** 2
+	return torch.mean(hsic)
 
 class VGAE(torch.nn.Module):
 	def __init__(self, in_channels, out_channels):
@@ -86,9 +123,6 @@ class VGAE(torch.nn.Module):
 		r"""Runs the decoder and computes edge probabilities."""
 		return self.decoder(*args, **kwargs)
 
-	# def balance(self, *args, **kwargs):
-	# 	return self.balance(*args, **kwargs)
-
 	def kl_loss(self, mu=None, logstd=None):
 		mu = self.__mu__ if mu is None else mu
 		logstd = self.__logstd__ if logstd is None else logstd.clamp(
@@ -99,8 +133,15 @@ class VGAE(torch.nn.Module):
 	def balance_loss(self, emb, t):
 		# emb: (num_nodes, z_dim)
 		t_pred = self.balance(emb)
+		# t_mean = torch.mean(t)*torch.ones((PARAM['num_nodes'])).unsqueeze(dim=1)
+
+		# shuffle tensor
+		# idx = torch.randperm(t.nelement())
+		# t = t.view(-1)[idx].view(t.size())
 		t =t.unsqueeze(dim=1)
-		return F.mse_loss(t_pred, t.float())
+
+		# return F.cross_entropy(t_pred, t.float())
+		return F.mse_loss(t_pred, t.float())*PARAM['dbias_reg']
 
 	def recon_loss(self, z, pos_edge_index, neg_edge_index=None):
 		r"""Given latent variables :obj:`z`, computes the binary cross
@@ -149,14 +190,18 @@ def main():
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 	t = torch.tensor(np.array(pd.read_csv(PARAM['feature'])['influence_0'])).to(device)
 
+
 	def train():
 		model.train()
 		optimizer.zero_grad()
 		z = model.encode(x, train_pos_edge_index)	# z: (num_nodes, z_dim)
+		bal_loss = model.balance_loss(z, t)
 
-		bal_loss = model.balance_loss(z, t)*PARAM['balance_reg']
+		# bal_loss = calHSIC(z, t) * PARAM['balance_reg']
+
 		rec_loss = model.recon_loss(z, train_pos_edge_index)
 		normKl_loss = (1 / data.num_nodes) * model.kl_loss()
+
 		loss = rec_loss + bal_loss +  normKl_loss	# new line
 		loss.backward()
 		optimizer.step()
@@ -168,9 +213,9 @@ def main():
 			z = model.encode(x, train_pos_edge_index)
 		if save_emb == True:
 			if PARAM['has_feature']==True:
-				emb_path = 'save_emb/vgae/' + graph + 'Ba' + str(PARAM['balance_reg']) + 'X_zdim_' + str(PARAM['z_dim'])
+				emb_path = 'save_emb/vgae/' + graph + 'Ba' + str(PARAM['dbias_reg']) + 'X_zdim_' + str(PARAM['z_dim'])
 			else:
-				emb_path = 'save_emb/vgae/' + graph + 'Ba' + str(PARAM['balance_reg']) + '_zdim_' + str(PARAM['z_dim'])
+				emb_path = 'save_emb/vgae/' + graph + 'Ba' + str(PARAM['dbias_reg']) + '_zdim_' + str(PARAM['z_dim'])
 			if not os.path.isdir(emb_path):
 				os.makedirs(emb_path)
 			pd.DataFrame(z.detach().cpu().numpy()).to_csv(emb_path + '/emb_' + str(i) + '.csv', index=False)
@@ -215,16 +260,17 @@ SEED = 100
 set_seed(SEED)
 
 if __name__ == "__main__":
-	graph = 'C_0_3_0.4_100_N'
+	graph = 'B_0_3_0.3_100_N'
 	for i in range(11,111):
 		PARAM = {
 			# model
 			'z_dim': 4,
-			'balance_reg': 2,
+			'dbias_reg': 0.1,
+			#'invar_reg': 4,
 
 			# train
-			'num_epochs': 1000,
-			'learning_rate': 0.005,
+			'num_epochs': 200,
+			'learning_rate': 0.01,
 
 			# data
 			'feature': 'data/gendt/'+graph+'/gendt_'+str(i)+'.csv',

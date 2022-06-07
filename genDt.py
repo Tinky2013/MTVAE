@@ -127,14 +127,14 @@ def main():
 
 PARAM = {
     # 0. causal graph
-    'causal_graph': 'C',
+    'causal_graph': 'B',
 
     # 1. net_param
     'alpha0': 0,
     'alpha1': 3,
 
     # 2. network size and dense
-    'network_density': 0.4,
+    'network_density': 0.3,
     'num_nodes': 100,
 
     # 3. network weight
@@ -145,9 +145,9 @@ PARAM = {
     # All fixed
     'epsilon': 0.2, # fixed
     'beta0': 0,     # fixed
-    'beta1': 0.7,   # fixed
-    'betaT': 0.5,   # fixed
-    'betaZ': [0.3],  # fixed
+    'beta1': 5,   # fixed
+    'betaT': 5,   # fixed
+    'betaZ': [2],  # fixed
 }
 
 if __name__ == "__main__":

@@ -96,14 +96,14 @@ SEED = 100
 set_seed(SEED)
 
 if __name__ == "__main__":
-	graph = 'B_0_3_0.4_100_N'
+	graph = 'B_0_3_0.1_100_N'
 	for i in range(11,111):
 		PARAM = {
 			# model
 			'z_dim': 4,
 			# train
-			'num_epochs': 1000,
-			'learning_rate': 0.005,
+			'num_epochs': 200,
+			'learning_rate': 0.01,
 			# data
 			'feature': 'data/gendt/'+graph+'/gendt_'+str(i)+'.csv',
 			'feature_col': 'x',
