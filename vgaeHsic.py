@@ -203,6 +203,7 @@ def main():
 		normKl_loss = (1 / data.num_nodes) * model.kl_loss()
 
 		loss = rec_loss + bal_loss +  normKl_loss	# new line
+
 		loss.backward()
 		optimizer.step()
 		return float(loss)
@@ -260,12 +261,12 @@ SEED = 100
 set_seed(SEED)
 
 if __name__ == "__main__":
-	graph = 'B_0_3_0.2_100_N'
+	graph = 'B_0_3_0.3_100_N'
 	for i in range(11,111):
 		PARAM = {
 			# model
 			'z_dim': 4,
-			'dbias_reg': 2,
+			'dbias_reg': 0.1,
 			#'invar_reg': 4,
 
 			# train

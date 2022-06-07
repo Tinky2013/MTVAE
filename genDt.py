@@ -145,9 +145,9 @@ PARAM = {
     # All fixed
     'epsilon': 0.2, # fixed
     'beta0': 0,     # fixed
-    'beta1': 5,   # fixed
-    'betaT': 5,   # fixed
-    'betaZ': [2],  # fixed
+    'beta1': 1,   # fixed
+    'betaT': 1,   # fixed
+    'betaZ': [1],  # fixed
 }
 
 if __name__ == "__main__":

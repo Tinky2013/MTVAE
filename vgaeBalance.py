@@ -133,15 +133,10 @@ class VGAE(torch.nn.Module):
 	def balance_loss(self, emb, t):
 		# emb: (num_nodes, z_dim)
 		t_pred = self.balance(emb)
-		# t_mean = torch.mean(t)*torch.ones((PARAM['num_nodes'])).unsqueeze(dim=1)
-
-		# shuffle tensor
-		# idx = torch.randperm(t.nelement())
-		# t = t.view(-1)[idx].view(t.size())
 		t =t.unsqueeze(dim=1)
 
 		# return F.cross_entropy(t_pred, t.float())
-		return F.mse_loss(t_pred, t.float())*PARAM['dbias_reg']
+		return F.mse_loss(t_pred, t.float())
 
 	def recon_loss(self, z, pos_edge_index, neg_edge_index=None):
 		r"""Given latent variables :obj:`z`, computes the binary cross
@@ -195,14 +190,16 @@ def main():
 		model.train()
 		optimizer.zero_grad()
 		z = model.encode(x, train_pos_edge_index)	# z: (num_nodes, z_dim)
-		bal_loss = model.balance_loss(z, t)
+		bal_loss = model.balance_loss(z, t) * PARAM['grl_reg']
 
-		# bal_loss = calHSIC(z, t) * PARAM['balance_reg']
+		hsic_loss = calHSIC(z, t) * PARAM['hsic_reg']
 
 		rec_loss = model.recon_loss(z, train_pos_edge_index)
 		normKl_loss = (1 / data.num_nodes) * model.kl_loss()
 
-		loss = rec_loss + bal_loss +  normKl_loss	# new line
+		loss = rec_loss + normKl_loss + bal_loss + hsic_loss
+		print(rec_loss.detach(), bal_loss.detach(), normKl_loss.detach(), hsic_loss.detach())
+
 		loss.backward()
 		optimizer.step()
 		return float(loss)
@@ -213,9 +210,9 @@ def main():
 			z = model.encode(x, train_pos_edge_index)
 		if save_emb == True:
 			if PARAM['has_feature']==True:
-				emb_path = 'save_emb/vgae/' + graph + 'Ba' + str(PARAM['dbias_reg']) + 'X_zdim_' + str(PARAM['z_dim'])
+				emb_path = 'save_emb/vgae/' + graph + 'g' + str(PARAM['grl_reg']) + 'h' + str(PARAM['hsic_reg']) + 'X_zdim_' + str(PARAM['z_dim'])
 			else:
-				emb_path = 'save_emb/vgae/' + graph + 'Ba' + str(PARAM['dbias_reg']) + '_zdim_' + str(PARAM['z_dim'])
+				emb_path = 'save_emb/vgae/' + graph + 'g' + str(PARAM['grl_reg']) + 'h' + str(PARAM['hsic_reg']) + '_zdim_' + str(PARAM['z_dim'])
 			if not os.path.isdir(emb_path):
 				os.makedirs(emb_path)
 			pd.DataFrame(z.detach().cpu().numpy()).to_csv(emb_path + '/emb_' + str(i) + '.csv', index=False)
@@ -251,7 +248,7 @@ def main():
 		# if epoch % 100==0:
 		#	print('Epoch: {:03d}, AUC: {:.4f}, AP: {:.4f}'.format(epoch, auc, ap))
 
-	auc, ap = test(data.test_pos_edge_index, data.test_neg_edge_index, save_emb=True)
+	auc, ap = test(data.test_pos_edge_index, data.test_neg_edge_index, save_emb=False)
 	print("Finish training VGAE_"+str(i))
 	print('AUC: {:.4f}, AP: {:.4f}'.format(auc, ap))
 	print("___________________________")
@@ -265,8 +262,8 @@ if __name__ == "__main__":
 		PARAM = {
 			# model
 			'z_dim': 4,
-			'dbias_reg': 0.1,
-			#'invar_reg': 4,
+			'grl_reg': 0.1,
+			'hsic_reg': 0.1,
 
 			# train
 			'num_epochs': 200,
