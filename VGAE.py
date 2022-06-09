@@ -96,7 +96,7 @@ SEED = 100
 set_seed(SEED)
 
 if __name__ == "__main__":
-	graph = 'B_0_3_0.1_100_N'
+	graph = 'B_0_3_0.3_100_N'
 	for i in range(11,111):
 		PARAM = {
 			# model
