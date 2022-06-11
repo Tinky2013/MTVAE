@@ -49,7 +49,7 @@ def main():
 
 
 if __name__ == "__main__":
-    St = ['Ba0.1', 'Ba0.5', 'Ba1',]
+    St = ['Ba10', 'Ba20',]
     for st in St:
         data = 'B_0_3_0.5_100_N'
         Prob = 0.352

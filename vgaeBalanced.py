@@ -43,8 +43,8 @@ class VariationalGCNEncoder(torch.nn.Module):
 class Balance(torch.nn.Module):
 	def __init__(self):
 		super(Balance,self).__init__()
-		self.gNet_inDim = 4, # zdim
-		self.gNet = torch.nn.Linear(4, 1)
+		self.gNet_inDim = 8, # zdim
+		self.gNet = torch.nn.Linear(8, 1)
 
 	def forward(self, emb):
 		t_pred = self.gNet(emb)
@@ -97,8 +97,8 @@ class VGAE(torch.nn.Module):
 
 	def balance_loss(self, emb, embn, t):
 		# emb, embn: (num_nodes, z_dim)
-		emb_con = torch.concat([emb, embn], dim=1)
-		t_pred = self.balance(emb)
+		emb_con = torch.cat([emb, embn], dim=1)
+		t_pred = self.balance(emb_con)
 		t =t.unsqueeze(dim=1)
 
 		# return F.cross_entropy(t_pred, t.float())
@@ -138,7 +138,9 @@ def cal_ave_neighbor_z(z, neighbor):
 	ave_z = torch.zeros((PARAM['num_nodes'], PARAM['z_dim']))
 	for i in range(PARAM['num_nodes']):
 		indices = neighbor[i]
-		ave_neighbor_z = torch.mean(z[indices], dim=0)
+		if len(indices)==0:
+			continue
+		ave_neighbor_z = torch.sum(z[indices], dim=0)/len(indices)
 		ave_z[i] = ave_neighbor_z
 	return ave_z
 
@@ -150,7 +152,7 @@ def main():
 		model.train()
 		optimizer.zero_grad()
 		z = model.encode(x, train_pos_edge_index)	# z: (num_nodes, z_dim)
-		zn = cal_ave_neighbor_z(z, neighbor)		# zn: (num_nodes, z_dim), neighbors average embedding
+		zn = cal_ave_neighbor_z(z, neighbor).to(device)		# zn: (num_nodes, z_dim), neighbors average embedding
 		bal_loss = model.balance_loss(z, zn, t) * PARAM['ba_reg']
 		rec_loss = model.recon_loss(z, train_pos_edge_index)
 		normKl_loss = (1 / data.num_nodes) * model.kl_loss()
@@ -218,7 +220,7 @@ SEED = 100
 set_seed(SEED)
 
 if __name__ == "__main__":
-	for ba in [0.1, 0.5, 1]:
+	for ba in [1,2,5,10,20,50]:
 		graph = 'B_0_3_0.3_100_N'
 		for i in range(11,111):
 			PARAM = {
