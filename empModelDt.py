@@ -9,70 +9,87 @@ from scipy.stats import chi2_contingency
 
 def main():
     dt = pd.read_csv(data_path)
-    emb = pd.read_csv(emb_path)
-    emb_Ba = pd.read_csv(emb_ba_path)
-    emb_fake = pd.read_csv(fake_emb)
+    emb1 = pd.read_csv(emb1_path)
+    emb2 = pd.read_csv(emb2_path)
 
-    emb.columns = ['emb_'+str(i) for i in range(len(emb.columns))]
-    emb_Ba.columns = ['emb_' + str(i) for i in range(len(emb_Ba.columns))]
-    emb_fake.columns = ['emb_' + str(i) for i in range(len(emb_fake.columns))]
+    emb1.columns = ['emb1_'+str(i) for i in range(len(emb1.columns))]
+    emb2.columns = ['emb2_' + str(i) for i in range(len(emb2.columns))]
 
-    dt1 = pd.concat([dt,emb], axis=1)
-    dt2 = pd.concat([dt,emb_Ba], axis=1)
-    dt3= pd.concat([dt,emb_fake], axis=1)
+    reg_dt = pd.concat([dt, emb1, emb2], axis=1)
 
-    vgae_emb4 = ' emb_0 + emb_1 + emb_2 + emb_3'
-    vgaeBa_emb4 = ' emb_0 + emb_1 + emb_2 + emb_3'
-    fake_emb4 = ' emb_0 + emb_1 + emb_2 + emb_3'
+    f1_emb = ' emb1_0 + emb1_1 + emb1_2 + emb1_3'
+    fn1_emb = ' emb1_0 + emb1_1 + emb1_2 + emb1_3 + emb1_4 + emb1_5 + emb1_6 + emb1_7'
+    n1_emb = ' emb1_4 + emb1_5 + emb1_6 + emb1_7'
+    f2_emb = ' emb2_0 + emb2_1 + emb2_2 + emb2_3'
+    fn2_emb = ' emb2_0 + emb2_1 + emb2_2 + emb2_3 + emb2_4 + emb2_5 + emb2_6 + emb2_7'
+    n2_emb = ' emb2_4 + emb2_5 + emb2_6 + emb2_7'
 
-    # vgae_emb16 = ' emb_0 + emb_1 + emb_2 + emb_3 + emb_4 + emb_5 + emb_6 + emb_7 + emb_8 + emb_9 + emb_10 + emb_11 + emb_12 + emb_13 + emb_14 + emb_15'
-    # vgaeBa_emb16 = ' emb_0 + emb_1 + emb_2 + emb_3 + emb_4 + emb_5 + emb_6 + emb_7 + emb_8 + emb_9 + emb_10 + emb_11 + emb_12 + emb_13 + emb_14 + emb_15'
-    # fake_emb16 = ' emb_0 + emb_1 + emb_2 + emb_3 + emb_4 + emb_5 + emb_6 + emb_7 + emb_8 + emb_9 + emb_10 + emb_11 + emb_12 + emb_13 + emb_14 + emb_15'
-
+    # incorrect
     formula0 = 'y1 ~ y0 + influence_0'
-    formula1 = 'y1 ~ y0 + influence_0 +' + vgae_emb4
-    formula2 = 'y1 ~ y0 + influence_0 +' + vgaeBa_emb4
-    formula3 = 'y1 ~ y0 + influence_0 +' + fake_emb4
+    # emb1 focal
+    formula1 = 'y1 ~ y0 + influence_0 +' + f1_emb
+    # emb1 focal+neighbor
+    formula2 = 'y1 ~ y0 + influence_0 +' + fn1_emb
+    # emb1 neighbor
+    formula3 = 'y1 ~ y0 + influence_0 +' + n1_emb
 
-    res = smf.ols(formula=formula0,data=dt).fit()
+    # emb2 focal
+    formula4 = 'y1 ~ y0 + influence_0 +' + f2_emb
+    # emb2 focal+neighbor
+    formula5 = 'y1 ~ y0 + influence_0 +' + fn2_emb
+    # emb2 neighbor
+    formula6 = 'y1 ~ y0 + influence_0 +' + n2_emb
+
+    # z+zn
+    formula7 = 'y1 ~ y0 + influence_0 + z + zn'
+    # z
+    formula8 = 'y1 ~ y0 + influence_0 + z'
+    # z
+    formula9 = 'y1 ~ y0 + influence_0 + zn'
+
+    res = smf.ols(formula=formula0,data=reg_dt).fit()
     inf0.append(res.params['influence_0'])
-    ylag0.append(res.params['y0'])
-    res = smf.ols(formula=formula1,data=dt1).fit()
+    res = smf.ols(formula=formula1,data=reg_dt).fit()
     inf1.append(res.params['influence_0'])
-    ylag1.append(res.params['y0'])
-    res = smf.ols(formula=formula2,data=dt2).fit()
+    res = smf.ols(formula=formula2,data=reg_dt).fit()
     inf2.append(res.params['influence_0'])
-    ylag2.append(res.params['y0'])
-    res = smf.ols(formula=formula3,data=dt3).fit()
+    res = smf.ols(formula=formula3,data=reg_dt).fit()
     inf3.append(res.params['influence_0'])
-    ylag3.append(res.params['y0'])
+    res = smf.ols(formula=formula4,data=reg_dt).fit()
+    inf4.append(res.params['influence_0'])
+    res = smf.ols(formula=formula5,data=reg_dt).fit()
+    inf5.append(res.params['influence_0'])
+    res = smf.ols(formula=formula6,data=reg_dt).fit()
+    inf6.append(res.params['influence_0'])
+    res = smf.ols(formula=formula7,data=reg_dt).fit()
+    inf7.append(res.params['influence_0'])
+    res = smf.ols(formula=formula8,data=reg_dt).fit()
+    inf8.append(res.params['influence_0'])
+    res = smf.ols(formula=formula9,data=reg_dt).fit()
+    inf9.append(res.params['influence_0'])
 
 
 if __name__ == "__main__":
-    St = ['Ba10', 'Ba20',]
-    for st in St:
-        data = 'B_0_3_0.5_100_N'
-        Prob = 0.352
+    for st in ['0.18','0.33','0.5','0.69','0.92','1.2']:
+        data = 'C_0_3_'+st+'_100_N'
         # graph = 'test'
-        inf0, ylag0 = [], []
-        inf1, ylag1 = [], []
-        inf2, ylag2 = [], []
-        inf3, ylag3 = [], []
+        inf0, inf1, inf2, inf3, inf4, inf5, inf6, inf7, inf8, inf9 = [], [], [], [], [], [], [], [], [], []
         for i in range(11,111):
             data_path = 'data/gendt/' + data + '/gendt_' + str(i) + '.csv'
-            emb_path = 'save_emb/vgae/'+ data +'_zdim_4/emb_'+str(i)+'.csv'
-            emb_ba_path = 'save_emb/vgae/'+ data + st + '_zdim_4/emb_'+str(i)+'.csv'
-            fake_emb = 'save_emb/fake_dim4.csv'
+            emb1_path = 'save_emb/vgae/'+ data + 'A1Y1' + '_zdim_4/emb_'+str(i)+'.csv'
+            emb2_path = 'save_emb/vgae/'+ data + 'A1Y0' + '_zdim_4/emb_'+str(i)+'.csv'
             main()
             print("regressing: ", i)
         result = pd.DataFrame({
             'inf0': inf0,
-            'ylag0': ylag0,
             'inf1': inf1,
-            'ylag1': ylag1,
             'inf2': inf2,
-            'ylag2': ylag2,
             'inf3': inf3,
-            'ylag3': ylag3,
+            'inf4': inf4,
+            'inf5': inf5,
+            'inf6': inf6,
+            'inf7': inf7,
+            'inf8': inf8,
+            'inf9': inf9,
         })
-        result.to_csv('result/'+data+st+'_'+str(Prob)+'p.csv',index=False)
+        result.to_csv('result/'+data+'.csv',index=False)

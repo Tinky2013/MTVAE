@@ -94,6 +94,14 @@ def generate_next_Y(y, Influence, Z, set_columns, seed):
     y_next.columns = set_columns
     return y_next
 
+def cal_ave_neighbor_z(z, neighbor):
+    ave_z = np.zeros(PARAM['num_nodes'])
+    for i in range(PARAM['num_nodes']):
+        indices = neighbor[i]
+        ave_neighbor_z = np.mean(z[indices])
+        ave_z[i] = ave_neighbor_z
+    return ave_z
+
 def main():
     # generate the network A
     z = np.random.uniform(0,1,size=PARAM['num_nodes'])
@@ -102,6 +110,14 @@ def main():
     uz_pi = pd.DataFrame(z_pi, columns=['z_pi'])
 
     A = generate_network(uz)
+
+    D = sp.coo_matrix(np.array(A)-np.eye(PARAM['num_nodes']))
+    neighbor = {i: [] for i in range(PARAM['num_nodes'])}
+    for j in range(len(D.col)):
+        neighbor[D.row[j]].append(D.col[j])
+    zn = cal_ave_neighbor_z(z,neighbor)
+    zn = pd.DataFrame(zn, columns=['zn'])
+
     A.to_csv(DATA_PATH['Unet'], index=False)
     # generate y0
     # A, B, D, E
@@ -121,7 +137,7 @@ def main():
     influence_true = pd.DataFrame(influence_true, columns=['influence_true'])
     influence_0 = pd.DataFrame(influence_0, columns=['influence_0'])
 
-    dt_train = pd.concat([uz, y0, y1, influence_true, influence_0], axis=1)
+    dt_train = pd.concat([uz, zn, y0, y1, influence_true, influence_0], axis=1)
     dt_train.to_csv(DATA_PATH['save_file'], index=False)
 
 
