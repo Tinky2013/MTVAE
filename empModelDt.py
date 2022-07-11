@@ -25,53 +25,53 @@ def main():
     n2_emb = ' emb2_4 + emb2_5 + emb2_6 + emb2_7'
 
     # incorrect
-    formula0 = 'y1 ~ y0 + influence_0'
+    formula0 = 'y1 ~ y0 + influence_estim'
     # emb1 focal
-    formula1 = 'y1 ~ y0 + influence_0 +' + f1_emb
+    formula1 = 'y1 ~ y0 + influence_estim +' + f1_emb
     # emb1 focal+neighbor
-    formula2 = 'y1 ~ y0 + influence_0 +' + fn1_emb
+    formula2 = 'y1 ~ y0 + influence_estim +' + fn1_emb
     # emb1 neighbor
-    formula3 = 'y1 ~ y0 + influence_0 +' + n1_emb
+    formula3 = 'y1 ~ y0 + influence_estim +' + n1_emb
 
     # emb2 focal
-    formula4 = 'y1 ~ y0 + influence_0 +' + f2_emb
+    formula4 = 'y1 ~ y0 + influence_estim +' + f2_emb
     # emb2 focal+neighbor
-    formula5 = 'y1 ~ y0 + influence_0 +' + fn2_emb
+    formula5 = 'y1 ~ y0 + influence_estim +' + fn2_emb
     # emb2 neighbor
-    formula6 = 'y1 ~ y0 + influence_0 +' + n2_emb
+    formula6 = 'y1 ~ y0 + influence_estim +' + n2_emb
 
     # z+zn
-    formula7 = 'y1 ~ y0 + influence_0 + z + zn'
+    formula7 = 'y1 ~ y0 + influence_estim + z + zn'
     # z
-    formula8 = 'y1 ~ y0 + influence_0 + z'
-    # z
-    formula9 = 'y1 ~ y0 + influence_0 + zn'
+    formula8 = 'y1 ~ y0 + influence_estim + z'
+    # zn
+    formula9 = 'y1 ~ y0 + influence_estim + zn'
 
     res = smf.ols(formula=formula0,data=reg_dt).fit()
-    inf0.append(res.params['influence_0'])
+    inf0.append(res.params['influence_estim'])
     res = smf.ols(formula=formula1,data=reg_dt).fit()
-    inf1.append(res.params['influence_0'])
+    inf1.append(res.params['influence_estim'])
     res = smf.ols(formula=formula2,data=reg_dt).fit()
-    inf2.append(res.params['influence_0'])
+    inf2.append(res.params['influence_estim'])
     res = smf.ols(formula=formula3,data=reg_dt).fit()
-    inf3.append(res.params['influence_0'])
+    inf3.append(res.params['influence_estim'])
     res = smf.ols(formula=formula4,data=reg_dt).fit()
-    inf4.append(res.params['influence_0'])
+    inf4.append(res.params['influence_estim'])
     res = smf.ols(formula=formula5,data=reg_dt).fit()
-    inf5.append(res.params['influence_0'])
+    inf5.append(res.params['influence_estim'])
     res = smf.ols(formula=formula6,data=reg_dt).fit()
-    inf6.append(res.params['influence_0'])
+    inf6.append(res.params['influence_estim'])
     res = smf.ols(formula=formula7,data=reg_dt).fit()
-    inf7.append(res.params['influence_0'])
+    inf7.append(res.params['influence_estim'])
     res = smf.ols(formula=formula8,data=reg_dt).fit()
-    inf8.append(res.params['influence_0'])
+    inf8.append(res.params['influence_estim'])
     res = smf.ols(formula=formula9,data=reg_dt).fit()
-    inf9.append(res.params['influence_0'])
+    inf9.append(res.params['influence_estim'])
 
 
 if __name__ == "__main__":
     for st in ['0.18','0.33','0.5','0.69','0.92','1.2']:
-        data = 'C_0_3_'+st+'_100_N'
+        data = 'E_0_3_'+st+'_100_U'
         # graph = 'test'
         inf0, inf1, inf2, inf3, inf4, inf5, inf6, inf7, inf8, inf9 = [], [], [], [], [], [], [], [], [], []
         for i in range(11,111):

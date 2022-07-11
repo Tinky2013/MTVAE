@@ -26,7 +26,6 @@ def generate_network(uz):
             logit = np.exp(PARAM['alpha0'] - PARAM['alpha1'] * np.sqrt(np.square(zi-zj))[0]) * PARAM['network_density']
             # A
             # logit = np.exp(PARAM['alpha0'] - PARAM['alpha1'] * np.sqrt(np.square(zi - np.array(0.5)))[0]) * PARAM['network_density']
-
             friend = np.random.binomial(1, logit / (1 + logit))
             A_dt[i][j], A_dt[j][i] = friend, friend
     network_density.append(((A_dt.sum()-N)*2/(N*(N-1))))
@@ -46,47 +45,54 @@ def cal_influence(A, y_binary, uz, uz_pi):
         (col, friend_list) = np.where(A[i]>0)
         friend_dict[str(i)] = friend_list
 
-    # [B] Default: equal influence weight
-    influence_weight = np.ones((N, N))  # 矩阵中aij代表i对j的influence (Default = 1)
-    influence_weight_observed = np.ones((N, N))
+    weighted_A = np.ones((N, N))  # 矩阵中aij代表i对j的influence (Default = 1)
+    # influence_weight_observed = np.ones((N, N))
 
     # [D] Uniform weight
-    # for i in range(N):
-    #     i_inf = np.array(uz.iloc[i, :]) + 0.5
-    #     influence_weight[i,:] = i_inf
+    for i in range(N):
+        # int from 0~9 represent social status
+        i_inf = int(np.array(uz.iloc[i, :])*100)%10/10 + 0.05
+        weighted_A[i,:] = i_inf
     # [E] Uniform weight
     # for i in range(N):
     #     for j in range(i, N):
-    #         ij_inf = 1.5 - np.abs(uz.iloc[i,:]-uz.iloc[j,:])
-    #         influence_weight[i][j] = ij_inf
-    #         influence_weight[j][i] = ij_inf
+    #         ij_inf = 1 - np.abs(uz.iloc[i,:]-uz.iloc[j,:])
+    #         weighted_A[i][j] = ij_inf
+    #         weighted_A[j][i] = ij_inf
 
     A = np.array(A)
-    influence_true, influence_observed = np.zeros(N), np.zeros(N)
+    influence_other, influence_estim = np.zeros(N), np.zeros(N)
     for j in range(N):
         denom = len(friend_dict[str(j)])
         if denom==0:
-            influence_true[j] = 0
+            influence_other[j] = 0
+            influence_estim[j] = 0
             continue
-        numer = sum(y_binary * influence_weight[:, j] * A[:, j])
-        numer_observed = sum(y_binary * influence_weight_observed[:, j] * A[:, j])
-        influence_true[j] = numer/denom
-        influence_observed[j] = numer_observed / denom
+
+        numer_estim = sum(y_binary * A[:, j])
+        influence_estim[j] = numer_estim / sum(A[:, j])
+
+        # [D][E]
+        numer_other = sum(weighted_A[:, j] * A[:, j])
+        influence_other[j] = numer_other/sum(A[:, j])
 
     # print(influence_weight)
-    return influence_true, influence_observed
+    return influence_other, influence_estim
 
-def generate_next_Y(y, Influence, Z, set_columns, seed):
+def generate_next_Y(y, Influence_other, Influence_estim, Z, set_columns, seed):
     np.random.seed(seed)
     # (1, treat_dim) * (treat_dim, num_nodes) -> (1, num_nodes)
     # Influence = np.matmul(np.array(PARAM['betaT'])[np.newaxis,:], np.array(T).T)
     # (1, featureX_dim) * (featureX_dim, num_nodes) -> (1, num_nodes)
     termZ = np.matmul(np.array(PARAM['betaZ'])[np.newaxis,:], np.array(Z).T)
 
-    Inf = np.array([i*PARAM['betaT'] for i in Influence])
+    Inf_other = np.array([i*PARAM['betaZ'][0] for i in Influence_other])
+    Inf_other = Inf_other[np.newaxis,:].T.astype(float)
+
+    Inf = np.array([i*PARAM['betaT'] for i in Influence_estim])
     Inf = Inf[np.newaxis,:].T.astype(float)
     eps = np.random.normal(0, PARAM['epsilon'], size=len(y))[np.newaxis,:].T
-    Logit = PARAM['beta0'] + PARAM['beta1'] * y + Inf + termZ.T + eps
+    Logit = PARAM['beta0'] + PARAM['beta1'] * y + Inf + Inf_other + termZ.T + eps
     # Logit: np.array(num_nodes, 1)
     # adopt_prob = np.exp(Logit)/(1+np.exp(Logit))
     # y_next = np.random.binomial(1, p=adopt_prob)
@@ -118,7 +124,7 @@ def main():
     zn = cal_ave_neighbor_z(z,neighbor)
     zn = pd.DataFrame(zn, columns=['zn'])
 
-    A.to_csv(DATA_PATH['Unet'], index=False)
+    A.to_csv(DATA_PATH['Unet'], index=False)   ## TODO: save files
     # generate y0
     # A, B, D, E
     y0 = pd.DataFrame(np.random.normal(PARAM['betaZ']*(z-0.5), 0.5, size=PARAM['num_nodes']), columns=['y0'])  # y(t-1)
@@ -129,21 +135,21 @@ def main():
     y0_binary[y0_binary>0]=1
 
     # generate T0
-    influence_true, influence_0 = cal_influence(A, np.array(y0_binary).T[0], uz, uz_pi)   # (num_nodes, treat_dim)
+    influence_other, influence_estim = cal_influence(A, np.array(y0_binary).T[0], uz, uz_pi)   # (num_nodes, treat_dim)
 
     # generate y1
     # y0: (num_nodes, 1), motif_vec_0: (num_nodes, treat_dim), ux0.iloc[:,1:]: (num_nodes, feature_dim)
-    y1 = pd.DataFrame(generate_next_Y(y0, influence_true, uz, set_columns=['y1'], seed=seed))
-    influence_true = pd.DataFrame(influence_true, columns=['influence_true'])
-    influence_0 = pd.DataFrame(influence_0, columns=['influence_0'])
+    y1 = pd.DataFrame(generate_next_Y(y0, influence_other, influence_estim, uz, set_columns=['y1'], seed=seed))
+    influence_other = pd.DataFrame(influence_other, columns=['influence_other'])
+    influence_estim = pd.DataFrame(influence_estim, columns=['influence_estim'])
 
-    dt_train = pd.concat([uz, zn, y0, y1, influence_true, influence_0], axis=1)
-    dt_train.to_csv(DATA_PATH['save_file'], index=False)
+    dt_train = pd.concat([uz, zn, y0, y1, influence_other, influence_estim], axis=1)
+    dt_train.to_csv(DATA_PATH['save_file'], index=False)   ## TODO: save files
 
 
 PARAM = {
     # 0. causal graph
-    'causal_graph': 'B',
+    'causal_graph': 'E',
 
     # 1. net_param
     'alpha0': 0,
@@ -155,8 +161,8 @@ PARAM = {
 
     # 3. network weight
     # describe how the network weights generated by z
-    # N-No, U-Uniform
-    'weight': 'N',
+    # N-No, U-Uniform, S-Square
+    'weight': 'U',
 
     # All fixed
     'epsilon': 0.5, # fixed

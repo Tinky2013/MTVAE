@@ -167,7 +167,7 @@ def cal_ave_neighbor_z(z, neighbor):
 
 def main():
 	device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-	t = torch.tensor(np.array(pd.read_csv(PARAM['feature'])['influence_0'])).to(device)
+	t = torch.tensor(np.array(pd.read_csv(PARAM['feature'])['influence_estim'])).to(device)
 	y0 = pd.read_csv(PARAM['feature'])['y0']
 	y0[y0<0]=0
 	y0[y0>0]=1
