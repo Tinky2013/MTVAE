@@ -73,7 +73,7 @@ def cal_influence(A, y_binary, uz, uz_pi):
         influence_estim[j] = numer_estim / sum(A[:, j])
 
         # [D][E]
-        numer_other = sum(weighted_A[:, j] * A[:, j])
+        numer_other = sum(y_binary * weighted_A[:, j] * A[:, j])
         influence_other[j] = numer_other/sum(A[:, j])
 
     # print(influence_weight)
@@ -86,7 +86,7 @@ def generate_next_Y(y, Influence_other, Influence_estim, Z, set_columns, seed):
     # (1, featureX_dim) * (featureX_dim, num_nodes) -> (1, num_nodes)
     termZ = np.matmul(np.array(PARAM['betaZ'])[np.newaxis,:], np.array(Z).T)
 
-    Inf_other = np.array([i*PARAM['betaZ'][0] for i in Influence_other])
+    Inf_other = np.array([i*PARAM['betaW'] for i in Influence_other])
     Inf_other = Inf_other[np.newaxis,:].T.astype(float)
 
     Inf = np.array([i*PARAM['betaT'] for i in Influence_estim])
@@ -149,7 +149,7 @@ def main():
 
 PARAM = {
     # 0. causal graph
-    'causal_graph': 'E',
+    'causal_graph': 'D',
 
     # 1. net_param
     'alpha0': 0,
@@ -169,6 +169,7 @@ PARAM = {
     'beta0': 0,     # fixed
     'beta1': 1,   # fixed
     'betaT': 1,   # fixed
+    'betaW': 0.3,
     'betaZ': [1],  # fixed
 }
 
